@@ -43,5 +43,8 @@
       "include/barcodes/pdf417.php",
       "include/barcodes/qrcode.php"
     ]
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^8.5"
   }
 }
