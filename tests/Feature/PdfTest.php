@@ -3,7 +3,9 @@
 namespace Feature;
 
 
-class PdfTest extends \TestCase
+use TestCase;
+
+class PdfTest extends TestCase
 {
 
 }
