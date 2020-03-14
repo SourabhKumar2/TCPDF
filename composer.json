@@ -25,6 +25,9 @@
     "php": ">=7.1"
   },
   "autoload": {
+    "psr-4": {
+      "TCPDF\\": "./src/"
+    },
     "classmap": [
       "config",
       "include",
