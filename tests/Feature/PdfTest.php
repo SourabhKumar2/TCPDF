@@ -20,7 +20,7 @@ class PdfTest extends TestCase
     }
 
     /** @test */
-    public function can_recieve_pdf_as_string()
+    public function can_recieve_pdf_as_string(): void
     {
         $output = $this->pdf->Output('', 'S');
 
