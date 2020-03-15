@@ -1,6 +1,6 @@
 <?php
 
-namespace OldAPI;
+namespace Test;
 
 use PHPUnit\Framework\TestCase;
 use TCPDF;
