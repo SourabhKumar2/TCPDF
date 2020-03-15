@@ -108,6 +108,8 @@
  */
 
 // TCPDF configuration
+use TCPDF\Output;
+
 require_once(dirname(__FILE__).'/tcpdf_autoconfig.php');
 // TCPDF static font methods and data
 require_once(dirname(__FILE__).'/include/tcpdf_font_data.php');
@@ -7635,7 +7637,11 @@ class TCPDF {
 			$this->buffer = substr($pdfdoc, 0, $byte_range[1]).'<'.$signature.'>'.substr($pdfdoc, $byte_range[1]);
 			$this->bufferlen = strlen($this->buffer);
 		}
-		return (new \TCPDF\Output($dest, $name, $this->getBuffer()))->output();
+		return (new Output())
+            ->setName($name)
+            ->setDestination($dest)
+		    ->setBuffer($this->getBuffer())
+            ->get();
 	}
 
 	protected static $cleaned_ids = array();

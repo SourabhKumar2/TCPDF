@@ -4,75 +4,87 @@
 namespace TCPDF;
 
 
+use ReflectionException;
+use ReflectionMethod;
 use RuntimeException;
+use TCPDF;
 use TCPDF_STATIC;
 
 class Output
 {
+    /** @var string */
     private $name;
+    /** @var string */
     private $destination;
+    /** @var string */
     private $buffer;
-    /**
-     * @var int
-     */
-    private $bufferlen;
+    /** @var int */
+    private $bufferLength;
 
     /**
-     * Output constructor.
-     * @param $destination
-     * @param $name
-     * @param $buffer
+     * @param string $name
+     * @return Output
      */
-    public function __construct($destination, $name, $buffer)
+    public function setName(string $name): Output
     {
-        $this->destination = $destination;
         $this->name = $name;
-        $this->buffer = $buffer;
-        $this->bufferlen = strlen($this->buffer);
+        return $this;
     }
 
-    public function output()
+    /**
+     * @param string $destination
+     * @return Output
+     */
+    public function setDestination(string $destination): Output
+    {
+        $this->destination = $destination;
+        return $this;
+    }
+
+
+    /**
+     * @return mixed|string
+     */
+    public function get()
     {
         switch ($this->destination) {
             case 'I':
-            {
                 $this->stream();
                 break;
-            }
             case 'D':
-            {
                 $this->download();
                 break;
-            }
             case 'F':
-            case 'FI':
-            case 'FD':
-            {
                 $this->save();
                 break;
-            }
+            case 'FI':
+                $this->save();
+                $this->checkIfDataSentAlready();
+                $this->sendToBrowser();
+                break;
+            case 'FD':
+                $this->save();
+                $this->download();
+                break;
             case 'E':
-            {
                 return $this->email();
-            }
             case 'S':
-            {
                 // returns PDF as a string
                 return $this->string();
-            }
             default:
-            {
-                $this->Error('Incorrect output destination: ' . $this->destination);
-            }
+                $this->error('Incorrect output destination: ' . $this->destination);
         }
     }
 
-    private function getBuffer()
+    /**
+     * @return string Data from the buffer
+     */
+    private function getBuffer(): string
     {
         return $this->buffer;
     }
 
-    private function Error(string $string): void
+    private function error(string $string): void
     {
         throw new RuntimeException('TCPDF ERROR: ' . $string);
     }
@@ -97,22 +109,20 @@ class Output
      */
     private function download(): void
     {
-        $this->checkIfDataSentAlready();;
+        $this->checkIfDataSentAlready();
         $this->setHeaders();
-        TCPDF_STATIC::sendOutputData($this->getBuffer(), $this->bufferlen);
+        TCPDF_STATIC::sendOutputData($this->getBuffer(), $this->bufferLength);
     }
 
+    /** Save PDF to local file */
     private function save(): void
     {
-// save PDF to a local file
-        $this->saveFileOnDisk();
-
-        if ($this->destination == 'FI') {
-        $this->checkIfDataSentAlready();;
-            $this->sendToBrowser();
-        } elseif ($this->destination == 'FD') {
-            $this->download();
+        $f = TCPDF_STATIC::fopenLocal($this->name, 'wb');
+        if (!$f) {
+            $this->error('Unable to create output file: ' . $this->name);
         }
+        fwrite($f, $this->getBuffer(), $this->bufferLength);
+        fclose($f);
     }
 
     /**
@@ -156,7 +166,7 @@ class Output
     private function setHeaders(): void
     {
         header('Content-Description: File Transfer');
-        $this->checkIfAlreadySent();
+        $this->checkIfHeadersAlreadySent();
 
         header('Cache-Control: private, must-revalidate, post-check=0, pre-check=0, max-age=1');
         //header('Cache-Control: public, must-revalidate, max-age=0'); // HTTP/1.1
@@ -181,17 +191,17 @@ class Output
         }
     }
 
-    private function checkIfAlreadySent(): void
+    private function checkIfHeadersAlreadySent(): void
     {
         if (headers_sent()) {
-            $this->Error('Some data has already been output to browser, can\'t send PDF file');
+            $this->error('Some data has already been output to browser, can\'t send PDF file');
         }
     }
 
     private function sendToBrowser(): void
     {
         header('Content-Type: application/pdf');
-        $this->checkIfAlreadySent();
+        $this->checkIfHeadersAlreadySent();
         header('Cache-Control: private, must-revalidate, post-check=0, pre-check=0, max-age=1');
 //        header('Cache-Control: public, must-revalidate, max-age=0'); // HTTP/1.1
         header('Pragma: public');
@@ -204,17 +214,18 @@ class Output
     private function checkIfDataSentAlready(): void
     {
         if (ob_get_contents()) {
-            $this->Error('Some data has already been output, can\'t send PDF file');
+            $this->error('Some data has already been output, can\'t send PDF file');
         }
     }
 
-    private function saveFileOnDisk(): void
+    /**
+     * @param $buffer
+     * @return Output
+     */
+    public function setBuffer($buffer): Output
     {
-        $f = TCPDF_STATIC::fopenLocal($this->name, 'wb');
-        if (!$f) {
-            $this->Error('Unable to create output file: ' . $this->name);
-        }
-        fwrite($f, $this->getBuffer(), $this->bufferlen);
-        fclose($f);
+        $this->buffer = $buffer;
+        $this->bufferLength = strlen($this->buffer);
+        return $this;
     }
 }
