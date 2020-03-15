@@ -1,6 +1,6 @@
 <?php
 
-namespace Feature;
+namespace OldAPI;
 
 use PHPUnit\Framework\TestCase;
 use TCPDF;
@@ -20,7 +20,7 @@ class PdfTest extends TestCase
     }
 
     /** @test */
-    public function can_recieve_pdf_as_string(): void
+    public function can_receive_pdf_as_string(): void
     {
         $output = $this->pdf->Output('', 'S');
 
@@ -58,6 +58,8 @@ class PdfTest extends TestCase
      * @test
      * @runInSeparateProcess
      * @dataProvider destinationDataProvider
+     * @param $destination
+     * @param $name
      */
     public function pdf_can_be_downloaded_to_browser($destination, $name): void
     {
@@ -65,9 +67,7 @@ class PdfTest extends TestCase
 
         $this->pdf->Output($name, $destination);
 
-        $output = ob_get_contents();
-
-        ob_end_clean();
+        $output = ob_get_clean();
 
         $expectedHeaders = [
             'Content-Description: File Transfer',
@@ -101,9 +101,7 @@ class PdfTest extends TestCase
         $name = __DIR__ . '/doc.pdf';
         $this->pdf->Output($name, 'FI');
 
-        $pdfContent = ob_get_contents();
-
-        ob_end_clean();
+        $pdfContent = ob_get_clean();
 
         $this->assertFileExists($name);
 
@@ -116,7 +114,7 @@ class PdfTest extends TestCase
      * @test
      * @runInSeparateProcess
      */
-    public function get_pdf_data_as_email_attachent_string(): void
+    public function get_pdf_data_as_email_attachment_string(): void
     {
         $name = 'doc.pdf';
         $email = $this->pdf->Output($name, 'E');
@@ -124,9 +122,7 @@ class PdfTest extends TestCase
         ob_start();
         $this->pdf->Output($name, 'D');
 
-        $buffer = ob_get_contents();
-
-        ob_end_clean();
+        $buffer = ob_get_clean();
 
         $contents = 'Content-Type: application/pdf;' . "\r\n";
         $contents .= ' name="' . $name . '"' . "\r\n";
