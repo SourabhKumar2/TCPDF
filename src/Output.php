@@ -82,104 +82,36 @@ class Output
      */
     private function stream(): void
     {
-        if (ob_get_contents()) {
-            $this->Error('Some data has already been output, can\'t send PDF file');
-        }
+        $this->checkIfDataSentAlready();
 
         if ($this->isCli()) {
             echo $this->getBuffer();
             return;
         }
 
-        // send output to a browser
-        header('Content-Type: application/pdf');
-        if (headers_sent()) {
-            $this->Error('Some data has already been output to browser, can\'t send PDF file');
-        }
-        header('Cache-Control: private, must-revalidate, post-check=0, pre-check=0, max-age=1');
-        //header('Cache-Control: public, must-revalidate, max-age=0'); // HTTP/1.1
-        header('Pragma: public');
-        header('Expires: Sat, 26 Jul 1997 05:00:00 GMT'); // Date in the past
-        header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
-        header('Content-Disposition: inline; filename="' . basename($this->name) . '"');
-        TCPDF_STATIC::sendOutputData($this->getBuffer(), $this->bufferlen);
+        $this->sendToBrowser();
     }
 
+    /**
+     * Download PDF as file
+     */
     private function download(): void
     {
-// download PDF as file
-        if (ob_get_contents()) {
-            $this->Error('Some data has already been output, can\'t send PDF file');
-        }
-        header('Content-Description: File Transfer');
-        if (headers_sent()) {
-            $this->Error('Some data has already been output to browser, can\'t send PDF file');
-        }
-        header('Cache-Control: private, must-revalidate, post-check=0, pre-check=0, max-age=1');
-        //header('Cache-Control: public, must-revalidate, max-age=0'); // HTTP/1.1
-        header('Pragma: public');
-        header('Expires: Sat, 26 Jul 1997 05:00:00 GMT'); // Date in the past
-        header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
-        // force download dialog
-        if ($this->isCgi()) {
-            header('Content-Type: application/pdf');
-        } else {
-            header('Content-Type: application/force-download');
-            header('Content-Type: application/octet-stream', false);
-            header('Content-Type: application/download', false);
-            header('Content-Type: application/pdf', false);
-        }
-        // use the Content-Disposition header to supply a recommended filename
-        header('Content-Disposition: attachment; filename="' . basename($this->name) . '"');
-        header('Content-Transfer-Encoding: binary');
+        $this->checkIfDataSentAlready();;
+        $this->setHeaders();
         TCPDF_STATIC::sendOutputData($this->getBuffer(), $this->bufferlen);
     }
 
     private function save(): void
     {
 // save PDF to a local file
-        $f = TCPDF_STATIC::fopenLocal($this->name, 'wb');
-        if (!$f) {
-            $this->Error('Unable to create output file: ' . $this->name);
-        }
-        fwrite($f, $this->getBuffer(), $this->bufferlen);
-        fclose($f);
+        $this->saveFileOnDisk();
+
         if ($this->destination == 'FI') {
-            // send headers to browser
-            header('Content-Type: application/pdf');
-            header('Cache-Control: private, must-revalidate, post-check=0, pre-check=0, max-age=1');
-            //header('Cache-Control: public, must-revalidate, max-age=0'); // HTTP/1.1
-            header('Pragma: public');
-            header('Expires: Sat, 26 Jul 1997 05:00:00 GMT'); // Date in the past
-            header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
-            header('Content-Disposition: inline; filename="' . basename($this->name) . '"');
-            TCPDF_STATIC::sendOutputData(file_get_contents($this->name), filesize($this->name));
+        $this->checkIfDataSentAlready();;
+            $this->sendToBrowser();
         } elseif ($this->destination == 'FD') {
-            // send headers to browser
-            if (ob_get_contents()) {
-                $this->Error('Some data has already been output, can\'t send PDF file');
-            }
-            header('Content-Description: File Transfer');
-            if (headers_sent()) {
-                $this->Error('Some data has already been output to browser, can\'t send PDF file');
-            }
-            header('Cache-Control: private, must-revalidate, post-check=0, pre-check=0, max-age=1');
-            header('Pragma: public');
-            header('Expires: Sat, 26 Jul 1997 05:00:00 GMT'); // Date in the past
-            header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
-            // force download dialog
-            if ($this->isCgi()) {
-                header('Content-Type: application/pdf');
-            } else {
-                header('Content-Type: application/force-download');
-                header('Content-Type: application/octet-stream', false);
-                header('Content-Type: application/download', false);
-                header('Content-Type: application/pdf', false);
-            }
-            // use the Content-Disposition header to supply a recommended filename
-            header('Content-Disposition: attachment; filename="' . basename($this->name) . '"');
-            header('Content-Transfer-Encoding: binary');
-            TCPDF_STATIC::sendOutputData(file_get_contents($this->name), filesize($this->name));
+            $this->download();
         }
     }
 
@@ -219,5 +151,70 @@ class Output
     private function isCgi(): bool
     {
         return strpos(PHP_SAPI, 'cgi') !== false;
+    }
+
+    private function setHeaders(): void
+    {
+        header('Content-Description: File Transfer');
+        $this->checkIfAlreadySent();
+
+        header('Cache-Control: private, must-revalidate, post-check=0, pre-check=0, max-age=1');
+        //header('Cache-Control: public, must-revalidate, max-age=0'); // HTTP/1.1
+        header('Pragma: public');
+        header('Expires: Sat, 26 Jul 1997 05:00:00 GMT'); // Date in the past
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
+        header('Content-Type: application/pdf');
+
+        $this->forceDownloadHeaders();
+
+        // use the Content-Disposition header to supply a recommended filename
+        header('Content-Disposition: attachment; filename="' . basename($this->name) . '"');
+        header('Content-Transfer-Encoding: binary');
+    }
+
+    private function forceDownloadHeaders(): void
+    {
+        if (!$this->isCgi()) {
+            header('Content-Type: application/force-download', false);
+            header('Content-Type: application/octet-stream', false);
+            header('Content-Type: application/download', false);
+        }
+    }
+
+    private function checkIfAlreadySent(): void
+    {
+        if (headers_sent()) {
+            $this->Error('Some data has already been output to browser, can\'t send PDF file');
+        }
+    }
+
+    private function sendToBrowser(): void
+    {
+        header('Content-Type: application/pdf');
+        $this->checkIfAlreadySent();
+        header('Cache-Control: private, must-revalidate, post-check=0, pre-check=0, max-age=1');
+//        header('Cache-Control: public, must-revalidate, max-age=0'); // HTTP/1.1
+        header('Pragma: public');
+        header('Expires: Sat, 26 Jul 1997 05:00:00 GMT'); // Date in the past
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
+        header('Content-Disposition: inline; filename="' . basename($this->name) . '"');
+        TCPDF_STATIC::sendOutputData(file_get_contents($this->name), filesize($this->name));
+    }
+
+    private function checkIfDataSentAlready(): void
+    {
+        if (ob_get_contents()) {
+            $this->Error('Some data has already been output, can\'t send PDF file');
+        }
+    }
+
+    private function saveFileOnDisk(): void
+    {
+        $f = TCPDF_STATIC::fopenLocal($this->name, 'wb');
+        if (!$f) {
+            $this->Error('Unable to create output file: ' . $this->name);
+        }
+        fwrite($f, $this->getBuffer(), $this->bufferlen);
+        fclose($f);
     }
 }
